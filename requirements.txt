@@ -1,0 +1,7 @@
+numpy
+scipy
+matplotlib
+tensorflow
+keras
+h5py
+fire
