@@ -12,7 +12,7 @@ class WeightShaper(keras.callbacks.Callback):
         super().__init__()
         log.info('Using weight shaper max_output: {}'.format(max_output))
         self.max_output = max_output
-        self.cooldown = 16
+        self.cooldown = cooldown
         self.cooldown_counter = 0
 
     def callback(self):
