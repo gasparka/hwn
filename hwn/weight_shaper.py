@@ -1,37 +1,49 @@
 import keras
 import numpy as np
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger('log')
+
 
 class WeightShaper(keras.callbacks.Callback):
-    def __init__(self):
+    def __init__(self, max_output, cooldown=16):
         super().__init__()
-        self.cooldown = 0
+        log.info('Using weight shaper max_output: {}'.format(max_output))
+        self.max_output = max_output
+        self.cooldown = 16
+        self.cooldown_counter = 0
 
     def callback(self):
         def scale_filter_output(layer):
             c = layer.get_weights()[0]
             cs = c.reshape(list(reversed(c.shape)))
 
+            total_error = 0
             for i, xx in enumerate(cs):
                 for j, x in enumerate(xx):
-                    cs[i][j] = x / np.sum(np.abs(x))
+                    coef = np.sum(np.abs(x)) / self.max_output
+                    cs[i][j] = x / coef
+                    total_error += coef - 1
 
             css = cs.reshape(c.shape)
             layer.set_weights([css])
+            return total_error
 
-        scale_filter_output(self.model.layers[0])
-        scale_filter_output(self.model.layers[2])
-        scale_filter_output(self.model.layers[4])
-        scale_filter_output(self.model.layers[6])
-        scale_filter_output(self.model.layers[8])
-        scale_filter_output(self.model.layers[10])
+        total_error = 0
+        total_error += scale_filter_output(self.model.layers[0])
+        total_error += scale_filter_output(self.model.layers[2])
+        total_error += scale_filter_output(self.model.layers[4])
+        total_error += scale_filter_output(self.model.layers[6])
+        total_error += scale_filter_output(self.model.layers[8])
+        total_error += scale_filter_output(self.model.layers[10])
+        log.info('Adjusted weights, total error was: {}'.format(total_error))
 
     def on_train_begin(self, logs={}):
         self.callback()
 
     def on_batch_end(self, batch, logs={}):
-        self.cooldown += 1
-        if self.cooldown > 64:
+        self.cooldown_counter += 1
+        if self.cooldown_counter % self.cooldown == 0:
             self.callback()
-            self.cooldown = 0
-            print('JO')

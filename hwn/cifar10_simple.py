@@ -16,7 +16,9 @@ from hwn.weight_shaper import WeightShaper
 
 
 class Cifar10Simple:
-    def __init__(self, use_bias=True, activation='relu', epochs=60, use_weight_shaper=False):
+    def __init__(self, use_bias=True, activation='relu', epochs=60, use_weight_shaper=False, weight_shaper_max_output=1.0, weight_shaper_cooldown=16):
+        self.weight_shaper_cooldown = weight_shaper_cooldown
+        self.weight_shaper_max_output = weight_shaper_max_output
         self.use_weight_shaper = use_weight_shaper
         self.epochs = epochs
         self.activation = activation
@@ -90,7 +92,7 @@ class Cifar10Simple:
 
         callbacks_list = [checkpoint]
         if self.use_weight_shaper:
-            callbacks_list.append(WeightShaper())
+            callbacks_list.append(WeightShaper(self.weight_shaper_max_output, self.weight_shaper_cooldown))
 
         model = self.keras_model()
         history_callback = model.fit_generator(datagen.flow(x_train, y_train,
