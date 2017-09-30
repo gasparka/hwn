@@ -33,9 +33,9 @@ class WeightShaper(keras.callbacks.Callback):
                     if coef < 0.9:
                         coef = 0.9
                     cs[i][j] = x / coef
-                    total_error += coef - 1
+                    total_error += abs(coef - 1)
 
-            log.info('Coef AVG={} MAX={} MIN={}'.format(np.mean(coefs), np.array(coefs).max(), np.array(coefs).min()))
+            log.info('Coef AVG={} MAX={} MIN={} TOTAL_ABS_ERROR(all layer filters)={}'.format(np.mean(coefs), np.array(coefs).max(), np.array(coefs).min(), total_error))
             css = cs.reshape(c.shape)
             layer.set_weights([css])
             return total_error

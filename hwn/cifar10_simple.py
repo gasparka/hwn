@@ -5,6 +5,7 @@ import pickle
 from datetime import datetime
 
 import fire
+import keras
 from keras.datasets import cifar10
 from keras.optimizers import SGD
 from keras.preprocessing.image import ImageDataGenerator
@@ -14,10 +15,24 @@ from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 
 from hwn.weight_shaper import WeightShaper
+import numpy as np
+
+
+class LossHistory(keras.callbacks.Callback):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+        self.losses = []
+
+    def on_epoch_end(self, batch, logs={}):
+        l = [logs.get('loss'), logs.get('acc'), logs.get('val_loss'), logs.get('val_acc')]
+        self.losses.append(l)
+        np.save(self.name + '_logs.npy', l)
 
 
 class Cifar10Simple:
-    def __init__(self, use_bias=False, activation='relu', epochs=60, use_weight_shaper=True, weight_shaper_max_output=1.0, weight_shaper_cooldown=64, use_full_model=True):
+    def __init__(self, use_bias=False, activation='relu', epochs=60, use_weight_shaper=True,
+                 weight_shaper_max_output=1.0, weight_shaper_cooldown=64, use_full_model=True):
         self.use_full_model = use_full_model
         self.weight_shaper_cooldown = weight_shaper_cooldown
         self.weight_shaper_max_output = weight_shaper_max_output
@@ -27,9 +42,9 @@ class Cifar10Simple:
         self.use_bias = use_bias
         self.id_str = datetime.now().strftime("%Y%m%d%H%M%S%f") + \
                       '_use_bias={}_activation={}_epochs={}_use_weight_shaper={}'.format(self.use_bias,
-                                                                                        self.activation,
-                                                                                        self.epochs,
-                                                                                        self.use_weight_shaper)
+                                                                                         self.activation,
+                                                                                         self.epochs,
+                                                                                         self.use_weight_shaper)
 
         if use_weight_shaper and not use_bias:
             Exception('Will not work...set use_bias=False')
@@ -62,7 +77,6 @@ class Cifar10Simple:
         print(model.summary())
         return model
 
-
     def full_model(self):
         model = Sequential()
 
@@ -91,7 +105,7 @@ class Cifar10Simple:
         model.add(GlobalAveragePooling2D())
         model.add(Activation('softmax'))
         sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-        model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
         print(model.summary())
         return model
@@ -126,7 +140,7 @@ class Cifar10Simple:
         checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True,
                                      save_weights_only=False, mode='max')
 
-        callbacks_list = [checkpoint]
+        callbacks_list = [checkpoint, LossHistory(self.id_str)]
         if self.use_weight_shaper:
             callbacks_list.append(WeightShaper(self.weight_shaper_max_output, self.weight_shaper_cooldown))
 
