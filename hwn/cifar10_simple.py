@@ -27,7 +27,7 @@ class LossHistory(keras.callbacks.Callback):
     def on_epoch_end(self, batch, logs={}):
         l = [logs.get('loss'), logs.get('acc'), logs.get('val_loss'), logs.get('val_acc')]
         self.losses.append(l)
-        np.save(self.name + '_logs.npy', l)
+        np.savetxt(self.name + '_logs.npy', self.losses)
 
 
 class Cifar10Simple:
@@ -80,31 +80,31 @@ class Cifar10Simple:
     def full_model(self):
         model = Sequential()
 
-        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias, input_shape=(32, 32, 3)))
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias, input_shape=(32, 32, 3)))
+        model.add(Activation('relu'))
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
+        model.add(Activation('relu'))
+        #model.add(Dropout(0.5))
+
+        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias))
         model.add(Activation('relu'))
         model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias))
         model.add(Activation('relu'))
         model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
         model.add(Activation('relu'))
-        model.add(Dropout(0.5))
+        #model.add(Dropout(0.5))
 
-        model.add(Conv2D(192, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias))
         model.add(Activation('relu'))
-        model.add(Conv2D(192, (3, 3), padding='same', use_bias=self.use_bias))
-        model.add(Activation('relu'))
-        model.add(Conv2D(192, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
-        model.add(Activation('relu'))
-        model.add(Dropout(0.5))
-
-        model.add(Conv2D(192, (3, 3), padding='same', use_bias=self.use_bias))
-        model.add(Activation('relu'))
-        model.add(Conv2D(192, (1, 1), padding='valid', use_bias=self.use_bias))
+        model.add(Conv2D(96, (1, 1), padding='valid', use_bias=self.use_bias))
         model.add(Activation('relu'))
         model.add(Conv2D(10, (1, 1), padding='valid', use_bias=self.use_bias))
 
         model.add(GlobalAveragePooling2D())
         model.add(Activation('softmax'))
-        sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+        sgd = SGD(lr=0.01, decay=1e-5, momentum=0.9, nesterov=True)
         model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
         print(model.summary())
