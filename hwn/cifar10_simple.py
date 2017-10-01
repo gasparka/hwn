@@ -31,8 +31,8 @@ class LossHistory(keras.callbacks.Callback):
 
 
 class Cifar10Simple:
-    def __init__(self, use_bias=False, activation='relu', epochs=60, use_weight_shaper=True,
-                 weight_shaper_max_output=1.0, weight_shaper_cooldown=64, use_full_model=True):
+    def __init__(self, use_bias=False, activation='relu', epochs=120, use_weight_shaper=True,
+                 weight_shaper_max_output=1.0, weight_shaper_cooldown=256, use_full_model=True):
         self.use_full_model = use_full_model
         self.weight_shaper_cooldown = weight_shaper_cooldown
         self.weight_shaper_max_output = weight_shaper_max_output
@@ -80,7 +80,15 @@ class Cifar10Simple:
     def full_model(self):
         model = Sequential()
 
-        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias, input_shape=(32, 32, 3)))
+        model.add(Conv2D(24, (3, 3), padding='same', use_bias=self.use_bias, input_shape=(32, 32, 3)))
+        model.add(Activation('relu'))
+        model.add(Conv2D(24, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(24, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
+        model.add(Activation('relu'))
+        #model.add(Dropout(0.5))
+
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
         model.add(Activation('relu'))
         model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
         model.add(Activation('relu'))
@@ -88,17 +96,9 @@ class Cifar10Simple:
         model.add(Activation('relu'))
         #model.add(Dropout(0.5))
 
-        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
         model.add(Activation('relu'))
-        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias))
-        model.add(Activation('relu'))
-        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
-        model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-
-        model.add(Conv2D(96, (3, 3), padding='same', use_bias=self.use_bias))
-        model.add(Activation('relu'))
-        model.add(Conv2D(96, (1, 1), padding='valid', use_bias=self.use_bias))
+        model.add(Conv2D(48, (1, 1), padding='valid', use_bias=self.use_bias))
         model.add(Activation('relu'))
         model.add(Conv2D(10, (1, 1), padding='valid', use_bias=self.use_bias))
 
