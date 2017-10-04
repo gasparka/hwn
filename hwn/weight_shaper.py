@@ -3,6 +3,8 @@ import numpy as np
 
 import logging
 
+from keras.layers import Conv2D
+
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger('log')
 
@@ -12,7 +14,7 @@ class WeightShaper(keras.callbacks.Callback):
         super().__init__()
         log.info('Using weight shaper max_output: {}'.format(max_output))
         self.max_output = max_output
-        self.cooldown = 16
+        self.cooldown = cooldown
         self.cooldown_counter = 0
 
     def callback(self):
@@ -20,25 +22,29 @@ class WeightShaper(keras.callbacks.Callback):
             c = layer.get_weights()[0]
             cs = c.reshape(list(reversed(c.shape)))
 
+            coefs = []
             total_error = 0
             for i, xx in enumerate(cs):
                 for j, x in enumerate(xx):
                     coef = np.sum(np.abs(x)) / self.max_output
+                    coefs.append(coef)
+                    if coef > 1.1:
+                        coef = 1.1
+                    if coef < 0.9:
+                        coef = 0.9
                     cs[i][j] = x / coef
-                    total_error += coef - 1
+                    total_error += abs(coef - 1)
 
+            log.info('Coef AVG={} MAX={} MIN={} TOTAL_ABS_ERROR(all layer filters)={}'.format(np.mean(coefs), np.array(coefs).max(), np.array(coefs).min(), total_error))
             css = cs.reshape(c.shape)
             layer.set_weights([css])
             return total_error
 
-        total_error = 0
-        total_error += scale_filter_output(self.model.layers[0])
-        total_error += scale_filter_output(self.model.layers[2])
-        total_error += scale_filter_output(self.model.layers[4])
-        total_error += scale_filter_output(self.model.layers[6])
-        total_error += scale_filter_output(self.model.layers[8])
-        total_error += scale_filter_output(self.model.layers[10])
-        log.info('Adjusted weights, total error was: {}'.format(total_error))
+        for i, layer in enumerate(self.model.layers):
+            if isinstance(layer, Conv2D) and layer.get_weights()[0].shape[:2] == (3, 3):
+                err = scale_filter_output(layer)
+                log.info('Adjusted layer {} weights, error was {}\n'.format(i, err))
+
 
     def on_train_begin(self, logs={}):
         self.callback()

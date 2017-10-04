@@ -5,18 +5,35 @@ import pickle
 from datetime import datetime
 
 import fire
+import keras
 from keras.datasets import cifar10
+from keras.optimizers import SGD
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
-from keras.layers import Activation, Conv2D, GlobalAveragePooling2D
+from keras.layers import Activation, Conv2D, GlobalAveragePooling2D, Dropout
 from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 
 from hwn.weight_shaper import WeightShaper
+import numpy as np
+
+
+class LossHistory(keras.callbacks.Callback):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+        self.losses = []
+
+    def on_epoch_end(self, batch, logs={}):
+        l = [logs.get('loss'), logs.get('acc'), logs.get('val_loss'), logs.get('val_acc')]
+        self.losses.append(l)
+        np.savetxt(self.name + '_logs.npy', self.losses)
 
 
 class Cifar10Simple:
-    def __init__(self, use_bias=True, activation='relu', epochs=60, use_weight_shaper=False, weight_shaper_max_output=1.0, weight_shaper_cooldown=16):
+    def __init__(self, use_bias=False, activation='relu', epochs=120, use_weight_shaper=True,
+                 weight_shaper_max_output=1.0, weight_shaper_cooldown=256, use_full_model=True):
+        self.use_full_model = use_full_model
         self.weight_shaper_cooldown = weight_shaper_cooldown
         self.weight_shaper_max_output = weight_shaper_max_output
         self.use_weight_shaper = use_weight_shaper
@@ -25,9 +42,9 @@ class Cifar10Simple:
         self.use_bias = use_bias
         self.id_str = datetime.now().strftime("%Y%m%d%H%M%S%f") + \
                       '_use_bias={}_activation={}_epochs={}_use_weight_shaper={}'.format(self.use_bias,
-                                                                                        self.activation,
-                                                                                        self.epochs,
-                                                                                        self.use_weight_shaper)
+                                                                                         self.activation,
+                                                                                         self.epochs,
+                                                                                         self.use_weight_shaper)
 
         if use_weight_shaper and not use_bias:
             Exception('Will not work...set use_bias=False')
@@ -56,6 +73,39 @@ class Cifar10Simple:
         model.compile(loss='categorical_crossentropy',
                       optimizer='rmsprop',
                       metrics=['accuracy'])
+
+        print(model.summary())
+        return model
+
+    def full_model(self):
+        model = Sequential()
+
+        model.add(Conv2D(24, (3, 3), padding='same', use_bias=self.use_bias, input_shape=(32, 32, 3)))
+        model.add(Activation('relu'))
+        model.add(Conv2D(24, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(24, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
+        model.add(Activation('relu'))
+        #model.add(Dropout(0.5))
+
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias, strides=(2, 2)))
+        model.add(Activation('relu'))
+        #model.add(Dropout(0.5))
+
+        model.add(Conv2D(48, (3, 3), padding='same', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(48, (1, 1), padding='valid', use_bias=self.use_bias))
+        model.add(Activation('relu'))
+        model.add(Conv2D(10, (1, 1), padding='valid', use_bias=self.use_bias))
+
+        model.add(GlobalAveragePooling2D())
+        model.add(Activation('softmax'))
+        sgd = SGD(lr=0.01, decay=1e-5, momentum=0.9, nesterov=True)
+        model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
         print(model.summary())
         return model
@@ -90,11 +140,15 @@ class Cifar10Simple:
         checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True,
                                      save_weights_only=False, mode='max')
 
-        callbacks_list = [checkpoint]
+        callbacks_list = [checkpoint, LossHistory(self.id_str)]
         if self.use_weight_shaper:
             callbacks_list.append(WeightShaper(self.weight_shaper_max_output, self.weight_shaper_cooldown))
 
-        model = self.keras_model()
+        if self.use_full_model:
+            model = self.full_model()
+        else:
+            model = self.keras_model()
+
         history_callback = model.fit_generator(datagen.flow(x_train, y_train,
                                                             batch_size=batch_size),
                                                steps_per_epoch=x_train.shape[0] // batch_size,
